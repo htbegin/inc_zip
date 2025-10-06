@@ -2,5 +2,8 @@
 name = "inczip"
 version = "0.1.0"
 
+[project.scripts]
+inczip = "inczip.cli:run_cli"
+
 [tool.setuptools]
 packages = ["inczip"]
