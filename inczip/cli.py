@@ -45,8 +45,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             changes = compare_states(old_state, new_state, mode=args.mode)
 
             # 4. Create the new zip
-            files_to_add = changes.added + changes.modified
-            deleted_paths = [meta.path for meta in changes.deleted]
+            # Combine and sort the files to be added/updated to ensure deterministic order
+            files_to_add = sorted(changes.added + changes.modified, key=lambda meta: meta.path)
+            deleted_paths = sorted([meta.path for meta in changes.deleted])
             create_zip(args.source_dir, files_to_add, deleted_paths, args.output)
             
             print(f"Backup created at {args.output}")
