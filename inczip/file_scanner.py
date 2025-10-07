@@ -1,9 +1,9 @@
-
 import os
 import zlib
 import datetime
 from pathlib import Path
 from typing import Dict
+from concurrent.futures import ProcessPoolExecutor
 
 from .models import FileMetadata
 
@@ -20,32 +20,53 @@ def scan_directory(root_path: str, mode: str = 'fast') -> Dict[str, FileMetadata
     Scans a directory recursively and returns a dictionary of FileMetadata
     objects for all files found, keyed by their relative path.
 
-    In 'accurate' mode, the CRC is calculated for every file. 
+    In 'accurate' mode, the CRC is calculated for every file in parallel. 
     In 'fast' mode, the CRC is skipped (None).
     """
     metadata_map = {}
     root_path_obj = Path(root_path)
 
+    # 1. First, quickly gather all file paths and their basic stats.
+    file_entries = []
     for dirpath, _, filenames in os.walk(root_path_obj):
         for filename in filenames:
             absolute_path = Path(dirpath) / filename
             relative_path = absolute_path.relative_to(root_path_obj)
             
-            file_stat = absolute_path.stat()
-            last_modified = datetime.datetime.fromtimestamp(file_stat.st_mtime)
-            
             # To handle platform-specific path separators (e.g., \ on Windows)
             relative_path_str = str(relative_path).replace('\\', '/')
 
+            file_entries.append({
+                "abs_path": absolute_path,
+                "rel_path": relative_path_str,
+                "stat": absolute_path.stat(),
+            })
+
+    # 2. Handle CRC calculation based on mode.
+    if mode == 'accurate':
+        paths_to_process = [entry["abs_path"] for entry in file_entries]
+        with ProcessPoolExecutor() as executor:
+            crc_results = executor.map(_calculate_crc, paths_to_process)
+
+        # Combine results into the final map
+        for entry, crc in zip(file_entries, crc_results):
+            stat = entry["stat"]
             metadata = FileMetadata(
-                path=relative_path_str,
-                last_modified=last_modified,
-                size=file_stat.st_size,
+                path=entry["rel_path"],
+                last_modified=datetime.datetime.fromtimestamp(stat.st_mtime),
+                size=stat.st_size,
+                crc=crc
             )
-
-            if mode == 'accurate':
-                metadata.crc = _calculate_crc(absolute_path)
-
+            metadata_map[metadata.path] = metadata
+    else:  # fast mode
+        for entry in file_entries:
+            stat = entry["stat"]
+            metadata = FileMetadata(
+                path=entry["rel_path"],
+                last_modified=datetime.datetime.fromtimestamp(stat.st_mtime),
+                size=stat.st_size,
+                crc=None
+            )
             metadata_map[metadata.path] = metadata
             
     return metadata_map
