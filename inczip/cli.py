@@ -17,6 +17,7 @@ def create_parser():
     backup_parser.add_argument("-o", "--output", required=True, help="Path for the new incremental zip file to be created.")
     backup_parser.add_argument("-i", "--increments", nargs='*', default=[], help="(Optional) Path to one or more existing incremental zips, in order of creation.")
     backup_parser.add_argument("--mode", choices=['fast', 'accurate'], default='fast', help="Comparison mode. Defaults to 'fast'.")
+    backup_parser.add_argument("--compress", action='store_true', help="Enable DEFLATE compression for the zip archive.")
 
     # Restore command parser
     restore_parser = subparsers.add_parser("restore", help="Restore a directory from a backup chain.")
@@ -65,7 +66,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("Creating new archive...")
             files_to_add = sorted(changes.added + changes.modified, key=lambda meta: meta.path)
             deleted_paths = sorted([meta.path for meta in changes.deleted])
-            create_zip(args.source_dir, files_to_add, deleted_paths, args.output)
+            create_zip(args.source_dir, files_to_add, deleted_paths, args.output, compress=args.compress)
             
             print(f"Backup created at {args.output}")
             return 0

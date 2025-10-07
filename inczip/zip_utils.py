@@ -36,21 +36,35 @@ def get_zip_metadata(zip_path: str) -> Dict[str, FileMetadata]:
 import json
 from pathlib import Path
 
-def create_zip(source_dir: str, files_to_add: List[FileMetadata], deleted_paths: List[str], output_path: str):
+from concurrent.futures import ProcessPoolExecutor
+
+def _read_file_worker(path: Path) -> bytes:
+    """Reads a file's content in a worker process."""
+    return path.read_bytes()
+
+def create_zip(source_dir: str, files_to_add: List[FileMetadata], deleted_paths: List[str], output_path: str, compress: bool = False):
     """
     Creates a new zip archive containing the specified files to add and a manifest
-    of deleted file paths.
+    of deleted file paths. File reading is done in parallel.
     """
     source_root = Path(source_dir)
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        # Add the new/modified files
-        for meta in files_to_add:
-            absolute_path = source_root / meta.path
-            zf.write(absolute_path, arcname=meta.path)
+    compression_method = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
+    
+    paths_to_read = [source_root / meta.path for meta in files_to_add]
+    arcnames = [meta.path for meta in files_to_add]
+
+    with zipfile.ZipFile(output_path, 'w', compression_method) as zf:
+        # Use a process pool to read files in parallel
+        with ProcessPoolExecutor() as executor:
+            # The map function returns an iterator that yields results in order
+            contents_iterator = executor.map(_read_file_worker, paths_to_read)
+            
+            # Write the contents to the zip file in the main process
+            for arcname, content in zip(arcnames, contents_iterator):
+                zf.writestr(arcname, content)
 
         # Create and add the manifest for deleted files
         if deleted_paths:
             manifest = {"deleted_files": deleted_paths}
-            # Use zf.writestr to write in-memory data to the zip
             zf.writestr(".manifest.json", json.dumps(manifest, indent=4))
 
