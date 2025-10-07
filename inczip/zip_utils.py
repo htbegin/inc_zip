@@ -6,13 +6,7 @@ import dataclasses
 
 from .models import FileMetadata
 
-@dataclasses.dataclass(frozen=True)
-class FileMetadata:
-    """A data class to hold metadata for a single file."""
-    path: str
-    last_modified: datetime.datetime
-    size: int
-    crc: int
+
 
 def get_zip_metadata(zip_path: str) -> Dict[str, FileMetadata]:
     """

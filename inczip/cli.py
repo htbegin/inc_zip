@@ -39,7 +39,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 old_state.update(get_zip_metadata(inc_zip))
 
             # 2. Scan the new directory
-            new_state = scan_directory(args.source_dir)
+            new_state = scan_directory(args.source_dir, mode=args.mode)
 
             # 3. Compare states
             changes = compare_states(old_state, new_state, mode=args.mode)

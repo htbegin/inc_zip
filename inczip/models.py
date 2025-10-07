@@ -1,11 +1,12 @@
 
 import datetime
 from dataclasses import dataclass
+from typing import Optional
 
-@dataclass(frozen=True)
+@dataclass
 class FileMetadata:
     """A data class to hold metadata for a single file."""
     path: str
     last_modified: datetime.datetime
     size: int
-    crc: int
+    crc: Optional[int] = None

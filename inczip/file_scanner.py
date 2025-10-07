@@ -15,10 +15,13 @@ def _calculate_crc(file_path: Path) -> int:
             crc = zlib.crc32(chunk, crc)
     return crc
 
-def scan_directory(root_path: str) -> Dict[str, FileMetadata]:
+def scan_directory(root_path: str, mode: str = 'fast') -> Dict[str, FileMetadata]:
     """
     Scans a directory recursively and returns a dictionary of FileMetadata
     objects for all files found, keyed by their relative path.
+
+    In 'accurate' mode, the CRC is calculated for every file. 
+    In 'fast' mode, the CRC is skipped (None).
     """
     metadata_map = {}
     root_path_obj = Path(root_path)
@@ -38,8 +41,11 @@ def scan_directory(root_path: str) -> Dict[str, FileMetadata]:
                 path=relative_path_str,
                 last_modified=last_modified,
                 size=file_stat.st_size,
-                crc=_calculate_crc(absolute_path)
             )
+
+            if mode == 'accurate':
+                metadata.crc = _calculate_crc(absolute_path)
+
             metadata_map[metadata.path] = metadata
             
     return metadata_map

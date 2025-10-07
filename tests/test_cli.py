@@ -31,7 +31,7 @@ def test_backup_command_happy_path(mock_create_zip, mock_compare, mock_scan, moc
 
     # Check that our core logic functions were called with the correct args
     assert mock_get_meta.call_count == 2
-    mock_scan.assert_called_once_with('test_source_dir')
+    mock_scan.assert_called_once_with('test_source_dir', mode='fast')
     mock_compare.assert_called_once_with({}, {}, mode='fast')
     
     # Check that the final zip creation function is called correctly
