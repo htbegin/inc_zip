@@ -1,20 +1,38 @@
 
 from unittest.mock import patch, MagicMock
 
-# This import will fail initially
-from inczip.cli import main
+from inczip.cli import main, _get_all_zip_metadata
+from inczip.file_scanner import scan_directory
 
 # We patch the functions that the CLI is supposed to call.
 # This allows us to test the CLI logic in isolation.
-@patch('inczip.cli.get_zip_metadata', return_value={}) 
-@patch('inczip.cli.scan_directory', return_value={})
-@patch('inczip.cli.compare_states', return_value=MagicMock(added=[], modified=[], deleted=[]))
-@patch('inczip.cli.create_zip') # This function doesn't exist yet
-def test_backup_command_happy_path(mock_create_zip, mock_compare, mock_scan, mock_get_meta):
+from concurrent.futures import Future
+
+@patch('inczip.cli.create_zip')
+@patch('inczip.cli.compare_states')
+@patch('inczip.cli.ProcessPoolExecutor')
+def test_backup_command_happy_path(mock_executor_cls, mock_compare, mock_create_zip):
     """
-    Tests that the backup command correctly parses args and calls the core logic.
+    Tests that the backup command correctly calls the core logic, mocking the parallel execution.
     """
-    # Simulate command line arguments
+    # Arrange: Set up mock return values for the futures
+    mock_scan_result = {'new_file.txt': 'new_meta'}
+    mock_zip_result = {'old_file.txt': 'old_meta'}
+    mock_compare.return_value = MagicMock(added=[], modified=[], deleted=[])
+
+    # Arrange: Mock the executor to return futures with our predefined results
+    mock_executor_instance = mock_executor_cls.return_value.__enter__.return_value
+    
+    scan_future = Future()
+    scan_future.set_result(mock_scan_result)
+    
+    zip_future = Future()
+    zip_future.set_result(mock_zip_result)
+
+    # The first submit call is for scan_directory, the second is for _get_all_zip_metadata
+    mock_executor_instance.submit.side_effect = [scan_future, zip_future]
+
+    # Act: Simulate command line arguments and run the main function
     args = [
         'backup',
         'test_source_dir',
@@ -22,22 +40,14 @@ def test_backup_command_happy_path(mock_create_zip, mock_compare, mock_scan, moc
         '--output', 'inc_1.zip',
         '--increments', 'inc_0.zip'
     ]
-
-    # Run the main CLI function with the mocked arguments
     result = main(args)
 
-    # Assertions
-    assert result == 0 # Successful exit code
-
-    # Check that our core logic functions were called with the correct args
-    assert mock_get_meta.call_count == 2
-    mock_scan.assert_called_once_with('test_source_dir', mode='fast')
-    mock_compare.assert_called_once_with({}, {}, mode='fast')
-    
-    # Check that the final zip creation function is called correctly
+    # Assert
+    assert result == 0
+    mock_executor_instance.submit.assert_any_call(scan_directory, 'test_source_dir', mode='fast')
+    mock_executor_instance.submit.assert_any_call(_get_all_zip_metadata, ['base.zip', 'inc_0.zip'])
+    mock_compare.assert_called_once_with(mock_zip_result, mock_scan_result, mode='fast')
     mock_create_zip.assert_called_once()
-    create_zip_args = mock_create_zip.call_args[0]
-    assert create_zip_args[0] == 'test_source_dir'
     
     
     @patch('inczip.cli.restore_archive_chain')

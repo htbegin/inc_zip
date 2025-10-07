@@ -25,27 +25,44 @@ def create_parser():
 
     return parser
 
+from concurrent.futures import ProcessPoolExecutor
+from typing import Dict
+
+def _get_all_zip_metadata(paths: List[str]) -> Dict[str, 'FileMetadata']:
+    """Helper function to run in a process, gets metadata from a list of zips."""
+    all_metadata = {}
+    for path in paths:
+        all_metadata.update(get_zip_metadata(path))
+    return all_metadata
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = create_parser()
-    # If argv is None, argparse uses sys.argv[1:]
     args = parser.parse_args(argv)
 
     try:
         if args.command == "backup":
             print("Starting backup...")
-            # 1. Get metadata from old zips
-            old_state = get_zip_metadata(args.base_zip)
-            for inc_zip in args.increments:
-                old_state.update(get_zip_metadata(inc_zip))
+            old_state = {}
+            new_state = {}
 
-            # 2. Scan the new directory
-            new_state = scan_directory(args.source_dir, mode=args.mode)
+            with ProcessPoolExecutor(max_workers=2) as executor:
+                print("Scanning source directory and existing archives in parallel...")
+                # Submit the directory scan for the new state
+                scan_future = executor.submit(scan_directory, args.source_dir, mode=args.mode)
 
-            # 3. Compare states
+                # Submit the zip metadata scans for the old state
+                zip_paths = [args.base_zip] + args.increments
+                zip_future = executor.submit(_get_all_zip_metadata, zip_paths)
+
+                # Collect results
+                print("Collecting results...")
+                new_state = scan_future.result()
+                old_state = zip_future.result()
+
+            print("Comparing states...")
             changes = compare_states(old_state, new_state, mode=args.mode)
 
-            # 4. Create the new zip
-            # Combine and sort the files to be added/updated to ensure deterministic order
+            print("Creating new archive...")
             files_to_add = sorted(changes.added + changes.modified, key=lambda meta: meta.path)
             deleted_paths = sorted([meta.path for meta in changes.deleted])
             create_zip(args.source_dir, files_to_add, deleted_paths, args.output)
@@ -53,6 +70,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"Backup created at {args.output}")
             return 0
         elif args.command == "restore":
+            # ... (restore logic remains the same)
             print(f"Restoring from {len(args.backup_files)} archives to {args.destination}...")
             restore_archive_chain(args.backup_files, args.destination)
             print("Restore complete.")
