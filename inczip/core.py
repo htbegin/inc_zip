@@ -38,7 +38,7 @@ def compare_states(old_state: Dict[str, FileMetadata],
         
         is_modified = False
         if old_meta.size != new_meta.size or \
-           int(old_meta.last_modified.timestamp()) != int(new_meta.last_modified.timestamp()):
+           abs(int(old_meta.last_modified.timestamp()) - int(new_meta.last_modified.timestamp())) > 1:
             is_modified = True
         elif mode == 'accurate' and old_meta.crc != new_meta.crc:
             is_modified = True
