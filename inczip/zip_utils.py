@@ -60,8 +60,12 @@ def create_zip(source_dir: str, files_to_add: List[FileMetadata], deleted_paths:
             contents_iterator = executor.map(_read_file_worker, paths_to_read)
             
             # Write the contents to the zip file in the main process
-            for arcname, content in zip(arcnames, contents_iterator):
-                zf.writestr(arcname, content)
+            for meta, content in zip(files_to_add, contents_iterator):
+                info = zipfile.ZipInfo(meta.path, date_time=meta.last_modified.timetuple()[:6])
+                # The compression type is already set on the ZipFile object, but we also
+                # set it on the ZipInfo object for clarity and correctness.
+                info.compress_type = compression_method
+                zf.writestr(info, content)
 
         # Create and add the manifest for deleted files
         if deleted_paths:
