@@ -1,7 +1,13 @@
+"Core logic for comparing file states and restoring archives."
+import json
+import os
+import zipfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Literal
 
 from .models import FileMetadata
+
 
 @dataclass
 class Changes:
@@ -10,16 +16,18 @@ class Changes:
     modified: List[FileMetadata] = field(default_factory=list)
     deleted: List[FileMetadata] = field(default_factory=list)
 
+
 CompareMode = Literal['fast', 'accurate']
 
-def compare_states(old_state: Dict[str, FileMetadata], 
+
+def compare_states(old_state: Dict[str, FileMetadata],
                    new_state: Dict[str, FileMetadata],
                    mode: CompareMode = 'fast') -> Changes:
     """
     Compares an old and new metadata map and returns a Changes object.
     """
     changes = Changes()
-    
+
     old_paths = set(old_state.keys())
     new_paths = set(new_state.keys())
 
@@ -35,23 +43,20 @@ def compare_states(old_state: Dict[str, FileMetadata],
     for path in old_paths & new_paths:
         old_meta = old_state[path]
         new_meta = new_state[path]
-        
+
         is_modified = False
         if old_meta.size != new_meta.size or \
-           abs(int(old_meta.last_modified.timestamp()) - int(new_meta.last_modified.timestamp())) > 1:
+           abs(int(old_meta.last_modified.timestamp()) -
+               int(new_meta.last_modified.timestamp())) > 1:
             is_modified = True
         elif mode == 'accurate' and old_meta.crc != new_meta.crc:
             is_modified = True
-            
+
         if is_modified:
             changes.modified.append(new_meta)
-            
+
     return changes
 
-import zipfile
-import json
-import os
-from pathlib import Path
 
 def restore_archive_chain(archive_paths: List[str], destination: str):
     """
@@ -72,9 +77,10 @@ def restore_archive_chain(archive_paths: List[str], destination: str):
                     manifest_data = json.load(mf)
                     for deleted_file in manifest_data.get("deleted_files", []):
                         all_deleted_files.add(deleted_file)
-            
+
             # We need to extract all members except the manifest itself
-            members_to_extract = [m for m in zf.infolist() if m.filename != ".manifest.json"]
+            members_to_extract = [
+                m for m in zf.infolist() if m.filename != ".manifest.json"]
             zf.extractall(dest_path, members=members_to_extract)
 
     # Process all deletions at the end

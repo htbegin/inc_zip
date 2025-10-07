@@ -1,15 +1,14 @@
-
-import zipfile
-import tempfile
-import os
-from pathlib import Path
+"""Tests for the zip utilities."""
 import datetime
+import json
+import os
+import tempfile
+import zipfile
+from pathlib import Path
 
 from inczip.models import FileMetadata
+from inczip.zip_utils import create_zip, get_zip_metadata
 
-
-# This import will fail initially, which is part of the TDD process.
-from inczip.zip_utils import get_zip_metadata, create_zip
 
 def test_get_zip_metadata():
     """
@@ -41,7 +40,7 @@ def test_get_zip_metadata():
         file1_info = metadata["file1.txt"]
         assert file1_info.path == "file1.txt"
         assert file1_info.size == len("content1")
-        
+
         # ZipFile stores timestamps in DOS format (2-second precision)
         # We check if the timestamp is approximately correct.
         file1_stat = file1_path.stat()
@@ -63,7 +62,7 @@ def test_create_zip():
     with tempfile.TemporaryDirectory() as temp_dir:
         source_path = Path(temp_dir) / "source"
         output_path = Path(temp_dir) / "output.zip"
-        
+
         # Create dummy source files
         file_to_add_path = source_path / "added.txt"
         file_to_ignore_path = source_path / "ignored.txt"
@@ -74,14 +73,16 @@ def test_create_zip():
         # Define what to add and what was deleted
         meta_to_add = FileMetadata(
             path="added.txt",
-            last_modified=datetime.datetime.fromtimestamp(file_to_add_path.stat().st_mtime),
+            last_modified=datetime.datetime.fromtimestamp(
+                file_to_add_path.stat().st_mtime),
             size=len("add this content"),
-            crc=0 # CRC not needed for this test's logic
+            crc=0  # CRC not needed for this test's logic
         )
         deleted_paths = ["deleted1.txt", "subdir/deleted2.txt"]
 
         # --- The actual test ---
-        create_zip(str(source_path), [meta_to_add], deleted_paths, str(output_path))
+        create_zip(str(source_path), [meta_to_add],
+                   deleted_paths, str(output_path))
 
         # --- Assertions ---
         assert output_path.exists()
@@ -101,7 +102,5 @@ def test_create_zip():
 
             # Check the content of the manifest
             with zf.open(".manifest.json") as f:
-                import json
                 manifest_data = json.load(f)
                 assert manifest_data["deleted_files"] == deleted_paths
-

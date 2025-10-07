@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+inczip/__init__.py
+inczip/cli.py
+inczip/core.py
+inczip/file_scanner.py
+inczip/models.py
+inczip/zip_utils.py
+inczip.egg-info/PKG-INFO
+inczip.egg-info/SOURCES.txt
+inczip.egg-info/dependency_links.txt
+inczip.egg-info/entry_points.txt
+inczip.egg-info/top_level.txt
+tests/test_cli.py
+tests/test_core.py
+tests/test_file_scanner.py
+tests/test_zip_utils.py

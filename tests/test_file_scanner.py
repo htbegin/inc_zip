@@ -1,11 +1,11 @@
-
+"""Tests for the file scanner."""
+import os
 import tempfile
 from pathlib import Path
-import os
 
-# This import will fail initially.
 from inczip.file_scanner import scan_directory
 from inczip.models import FileMetadata
+
 
 def test_scan_directory():
     """

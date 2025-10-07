@@ -1,16 +1,18 @@
-
+"""Tests for the core logic."""
 import datetime
-import zlib
-import tempfile
-from pathlib import Path
-import zipfile
 import json
+import tempfile
+import zipfile
+import zlib
+from pathlib import Path
 
+from inczip.core import Changes, compare_states, restore_archive_chain
 from inczip.models import FileMetadata
-from inczip.core import compare_states, Changes, restore_archive_chain
+
 
 # Helper to create dummy metadata
 def create_meta(path, content, days_old=1):
+    """Creates a FileMetadata object for testing."""
     return FileMetadata(
         path=path,
         last_modified=datetime.datetime.now() - datetime.timedelta(days=days_old),
@@ -18,12 +20,11 @@ def create_meta(path, content, days_old=1):
         crc=zlib.crc32(content.encode())
     )
 
+
 def test_compare_states():
     """
     Tests the comparison logic between an old state (zip) and a new state (fs).
     """
-    import zlib
-
     # Define states
     old_state = {
         "file1.txt": create_meta("file1.txt", "content1"),
@@ -32,8 +33,9 @@ def test_compare_states():
     }
 
     new_state = {
-        "file1.txt": create_meta("file1.txt", "content1"), # Unchanged
-        "file_to_modify.txt": create_meta("file_to_modify.txt", "modified_content", days_old=0),
+        "file1.txt": create_meta("file1.txt", "content1"),  # Unchanged
+        "file_to_modify.txt": create_meta(
+            "file_to_modify.txt", "modified_content", days_old=0),
         "new_file.txt": create_meta("new_file.txt", "i am new", days_old=0),
     }
 
@@ -74,11 +76,11 @@ def test_restore_archive_chain():
             zf.writestr(".manifest.json", json.dumps(manifest))
 
         # --- The actual test ---
-        restore_archive_chain([str(base_zip_path), str(inc_zip_path)], str(dest_path))
+        restore_archive_chain(
+            [str(base_zip_path), str(inc_zip_path)], str(dest_path))
 
         # --- Assertions ---
         assert dest_path.exists()
         assert (dest_path / "file1.txt").read_text() == "inc_content_1_modified"
         assert (dest_path / "new_file.txt").read_text() == "new_content"
         assert not (dest_path / "file_to_delete.txt").exists()
-

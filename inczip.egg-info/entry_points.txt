@@ -1,0 +1,2 @@
+[console_scripts]
+inczip = inczip.cli:run_cli
